@@ -1,14 +1,25 @@
 package com.codeit.security.config;
 
+import com.codeit.security.filter.IpCheckFilter;
+import com.codeit.security.filter.RequestIdFilter;
+import com.codeit.security.filter.RequestLoggingFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    // 등록하고자 하는 필터 객체를 주입
+    private final RequestLoggingFilter requestLoggingFilter;
+    private final IpCheckFilter ipCheckFilter;
+    private final RequestIdFilter requestIdFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -19,6 +30,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // 인증 필터 동작 전에 로깅하기 위해 필터 추가
+                .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(ipCheckFilter, RequestIdFilter.class)
+                .addFilterAfter(requestLoggingFilter, IpCheckFilter.class)
+
                 // 특정 경로에 대한 권한을 설정
                 .authorizeHttpRequests(auth ->
                 auth.requestMatchers("/", "/h2-console/**", "/signup", "/css/**", "/js/**").permitAll()
