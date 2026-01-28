@@ -6,7 +6,9 @@ import com.codeit.security.filter.RequestLoggingFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -14,6 +16,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @RequiredArgsConstructor
+@EnableWebSecurity
+@EnableMethodSecurity // 권한 검사를 컨트롤러(서비스)의 메서드에서 전역적으로 수행하기 위한 설정.
 public class SecurityConfig {
 
     // 등록하고자 하는 필터 객체를 주입
@@ -36,8 +40,27 @@ public class SecurityConfig {
                 .addFilterAfter(requestLoggingFilter, IpCheckFilter.class)
 
                 // 특정 경로에 대한 권한을 설정
-                .authorizeHttpRequests(auth ->
-                auth.requestMatchers("/", "/h2-console/**", "/signup", "/css/**", "/js/**").permitAll()
+                // 위에서 아래로 순차적 평가, 먼저 매칭되면 그것을 적용
+                // 구체적인 것을 위에, 일반적인 것을 아래에
+                .authorizeHttpRequests(auth -> auth
+                        // 공개 접근 (인증 불필요)
+                        // .anonymous(): 로그인 하지 않은 사용자만 허용
+                        .requestMatchers("/", "/signup", "/login").permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/public/**").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
+
+                        // ADMIN 권한 필요
+                        // hasRole("ADMIN"): "ROLE_ADMIN" 권한 확인 -> 보통 얘를 사용
+                        // hasAuthority("ROLE_ADMIN"): 정확히 "ROLE_ADMIN" 확인
+//                        .requestMatchers("/admin/**").hasRole("ADMIN")
+
+                        // MANAGER 또는 ADMIN 권한 필요
+                        .requestMatchers("/manager/**").hasAnyRole("MANAGER", "ADMIN")
+
+                        // USER 권한 필요
+                        .requestMatchers("/user/**").hasRole("USER")
+
+                        // 나머지는 인증만 필요 (권한 무관)
                         .anyRequest().authenticated()
                 )
                 // 로그인 폼 설정 (REST에서는 사용하지 않습니다)
@@ -47,6 +70,7 @@ public class SecurityConfig {
                 // 로그아웃 설정
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
+                        .deleteCookies("JSESSIONID")
                         .permitAll()
                 )
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**")) // H2는 CSRF 검증 제외
