@@ -3,8 +3,10 @@ package com.codeit.security.config;
 import com.codeit.security.filter.IpCheckFilter;
 import com.codeit.security.filter.RequestIdFilter;
 import com.codeit.security.filter.RequestLoggingFilter;
+import com.codeit.security.filter.SessionIdLoggingFilter;
 import com.codeit.security.security.CustomAccessDeniedHandler;
 import com.codeit.security.security.CustomAuthenticationEntryPoint;
+import com.codeit.security.security.CustomAuthenticationSuccessHandler;
 import com.codeit.security.security.SpaCsrfTokenRequestHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -22,6 +25,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.firewall.HttpFirewall;
+import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
@@ -35,6 +40,7 @@ public class SecurityConfig {
     private final IpCheckFilter ipCheckFilter;
     private final RequestIdFilter requestIdFilter;
     private final SessionRegistry sessionRegistry;
+    private final CustomAuthenticationSuccessHandler successHandler;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -54,7 +60,8 @@ public class SecurityConfig {
                         .configurationSource(configurationSource)
                 )
                 // 인증 필터 동작 전에 로깅하기 위해 필터 추가
-                .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new SessionIdLoggingFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(requestIdFilter, SessionIdLoggingFilter.class)
                 .addFilterAfter(ipCheckFilter, RequestIdFilter.class)
                 .addFilterAfter(requestLoggingFilter, IpCheckFilter.class)
 
@@ -90,6 +97,7 @@ public class SecurityConfig {
                 // 로그인 폼 설정 (REST에서는 사용하지 않습니다)
                 .formLogin(form -> form
                         .loginPage("/login") // 커스텀 로그인 페이지 경로
+                        .successHandler(successHandler)
                         .permitAll()
                 )
                 // 로그아웃 설정
@@ -119,6 +127,10 @@ public class SecurityConfig {
                                 .expiredUrl("/session-expired")
                         )
 
+                        .sessionFixation().changeSessionId() // 세션 ID만 변경하고 세션 객체는 그대로 유지
+//                        .sessionFixation().migrateSession() // 새 세션을 생성해서 기존 세션의 모든 속성을 복사 후 기존 세션 무효화
+//                        .sessionFixation().newSession() // 새 세션을 생성, 기존 데이터 유지되지 않음!
+//                        .sessionFixation().none() // 사용하지 마세요. 아무것도 안 합니다.
 
                 );
 
