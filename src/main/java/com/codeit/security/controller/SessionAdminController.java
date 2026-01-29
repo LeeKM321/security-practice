@@ -8,6 +8,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
@@ -62,7 +64,38 @@ public class SessionAdminController {
     }
 
 
-    
+    // 특정 사용자의 모든 세션 강제 만료
+    // 계정 관리, 보안 위협 대응 등에 사용
+    @PostMapping("/sessions/{username}/expire")
+    public String expireUserSession(@PathVariable String username) {
+        log.info("강제 로그아웃 요청 들어옴! 대상: {}", username);
+
+        List<Object> principals = sessionRegistry.getAllPrincipals();
+
+        // 해당 username의 Principal 찾기
+        principals.stream()
+                .filter(p -> ((UserDetails)p).getUsername().equals(username))
+                .findFirst()
+                .ifPresentOrElse(
+                        principal -> {
+                            List<SessionInformation> sessions
+                                    = sessionRegistry.getAllSessions(principal, false);
+
+                            log.info("만료할 세션 수: {}", sessions.size());
+
+                            sessions.forEach(session -> {
+                                log.info("세션 만료!: {}", session.getSessionId());
+                                session.expireNow();
+                            });
+
+                        },
+                        () -> {
+                            log.warn("사용자를 찾을 수 없음: {}", username);
+                        }
+                );
+
+        return "redirect:/admin/sessions";
+    }
 
 
 
