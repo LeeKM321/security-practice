@@ -4,10 +4,8 @@ import com.codeit.security.filter.IpCheckFilter;
 import com.codeit.security.filter.RequestIdFilter;
 import com.codeit.security.filter.RequestLoggingFilter;
 import com.codeit.security.filter.SessionIdLoggingFilter;
-import com.codeit.security.security.CustomAccessDeniedHandler;
-import com.codeit.security.security.CustomAuthenticationEntryPoint;
-import com.codeit.security.security.CustomAuthenticationSuccessHandler;
-import com.codeit.security.security.SpaCsrfTokenRequestHandler;
+import com.codeit.security.repository.JpaPersistentTokenRepository;
+import com.codeit.security.security.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,6 +39,9 @@ public class SecurityConfig {
     private final RequestIdFilter requestIdFilter;
     private final SessionRegistry sessionRegistry;
     private final CustomAuthenticationSuccessHandler successHandler;
+    private final JpaPersistentTokenRepository persistentTokenRepository;
+    private final CustomUserDetailsService userDetailsService;
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -103,7 +104,7 @@ public class SecurityConfig {
                 // 로그아웃 설정
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
-                        .deleteCookies("JSESSIONID")
+                        .deleteCookies("JSESSIONID", "remember-me")
                         .permitAll()
                 )
                 .csrf(csrf -> csrf
@@ -132,6 +133,28 @@ public class SecurityConfig {
 //                        .sessionFixation().newSession() // 새 세션을 생성, 기존 데이터 유지되지 않음!
 //                        .sessionFixation().none() // 사용하지 마세요. 아무것도 안 합니다.
 
+                )
+                .rememberMe(remember -> remember
+                        // 1. 비밀키 (토큰 서명용, 민감정보!)
+                        .key("myUniqueAndSecretRememberMeKey2026")
+
+                        // 2. 구현한 저장소 연결
+                        .tokenRepository(persistentTokenRepository)
+
+                        // 3. 토큰 유효 기간 (초단위)
+                        .tokenValiditySeconds(60 * 60 * 24 * 14) // 14일
+
+                        // 4. UserDetailsService (인증용)
+                        .userDetailsService(userDetailsService)
+
+                        // 5. HTML 폼 파라미터 이름 (체크박스의 name과 정확히 일치하게 작성!)
+                        .rememberMeParameter("remember-me")
+
+                        // 6. 쿠키 이름
+                        .rememberMeCookieName("remember-me")
+
+                        // 7. HTTPS 전용 쿠키 여부
+                        .useSecureCookie(false)
                 );
 
         return http.build();
