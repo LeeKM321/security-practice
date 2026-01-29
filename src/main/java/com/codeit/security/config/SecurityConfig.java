@@ -16,6 +16,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -33,6 +34,7 @@ public class SecurityConfig {
     private final RequestLoggingFilter requestLoggingFilter;
     private final IpCheckFilter ipCheckFilter;
     private final RequestIdFilter requestIdFilter;
+    private final SessionRegistry sessionRegistry;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -64,7 +66,7 @@ public class SecurityConfig {
                         // .anonymous(): 로그인 하지 않은 사용자만 허용
                         .requestMatchers("/", "/signup", "/login").permitAll()
                         .requestMatchers("/css/**", "/js/**", "/public/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/h2-console/**", "/session-expired").permitAll()
                         .requestMatchers("/api/auth/csrf-token", "/api/auth").permitAll() // 토큰 발급용 엔드포인트는 로그인 없이 접근 가능
 
                         // ADMIN 권한 필요
@@ -108,8 +110,16 @@ public class SecurityConfig {
 //                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) -> JWT는 세션 안씁니다.
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .invalidSessionUrl("/session-expired") // 세션 만료시 이동할 URL
-                        .maximumSessions(1) // 한 사용자 당 최대 세션 수
-                        .maxSessionsPreventsLogin(false) // false: 새 로그인 시 이전 세션 만료, true: 이미 로그인 되어있다면 새 로그인 차단
+
+                        // 동시성 관련 설정은 이 블록 안에서 작성한다.
+                        .sessionConcurrency(concurrency -> concurrency
+                                .maximumSessions(1) // 한 사용자 당 최대 세션 수
+                                .maxSessionsPreventsLogin(false) // false: 새 로그인 시 이전 세션 만료, true: 이미 로그인 되어있다면 새 로그인 차단
+                                .sessionRegistry(sessionRegistry)
+                                .expiredUrl("/session-expired")
+                        )
+
+
                 );
 
         return http.build();

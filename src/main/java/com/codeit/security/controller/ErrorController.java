@@ -11,4 +11,9 @@ public class ErrorController {
         return "error/access-denied";
     }
 
+    @GetMapping("/session-expired")
+    public String sessionExpired() {
+        return "error/session-expired";
+    }
+
 }

@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 @Getter
 @RequiredArgsConstructor
@@ -45,6 +46,25 @@ public class CustomUserDetails implements UserDetails {
         return user;
     }
 
+    /*
+    크롬 로그인: User 객체 A (ID: user, 주소: 0x10)
+    사파리 로그인: User 객체 B (ID: user 주소: 0x20)
+
+    - equals()를 재정의하지 않으면 자바는 주소값으로 비교합니다. ID가 같더라도 주소가 다르기 때문에 서로 다른 계정으로 인식합니다.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CustomUserDetails that = (CustomUserDetails) o;
+        // DB의 유니크한 ID나 username으로 비교
+        return Objects.equals(user.getUsername(), that.user.getUsername());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(user.getUsername());
+    }
 }
 
 
